@@ -16,16 +16,23 @@ export default function AuthModal({ mode, onClose, onSuccess, onModeChange }: Pr
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<UserRole>('sales');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
     if (!email || !password) return setError('Enter your email and password.');
+
     try {
-      const user = mode === 'signup' ? signUp(email, password, role) : signIn(email, password);
+      setLoading(true);
+      const user = mode === 'signup'
+        ? await signUp(email, password, role)
+        : await signIn(email, password);
       onSuccess(user);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.');
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -45,7 +52,7 @@ export default function AuthModal({ mode, onClose, onSuccess, onModeChange }: Pr
         <label>Email<input type="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={e=>setEmail(e.target.value)}/></label>
         <label>Password<input type="password" autoComplete={mode==='signup'?'new-password':'current-password'} placeholder="••••••••" value={password} onChange={e=>setPassword(e.target.value)}/></label>
         {error && <div className="authError">{error}</div>}
-        <button className="authSubmit" type="submit"><Flame size={17} fill="currentColor"/>{mode==='signup'?'Create account':'Sign in'}</button>
+        <button className="authSubmit" type="submit" disabled={loading}><Flame size={17} fill="currentColor"/>{loading ? 'Connecting…' : mode==='signup'?'Create account':'Sign in'}</button>
       </form>
       <div className="authSwitch">{mode==='signup'?'Already have an account?':'New to FireRanky?'} <button onClick={()=>onModeChange(mode==='signup'?'login':'signup')}>{mode==='signup'?'Sign in':'Create one'}</button></div>
     </div>
