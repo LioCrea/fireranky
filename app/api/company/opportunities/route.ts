@@ -1,0 +1,1 @@
+import{NextResponse}from'next/server';import{createOpportunity}from'../../../lib/server-company';export async function POST(req:Request){try{return NextResponse.json({opportunity:await createOpportunity(req,await req.json())},{status:201})}catch(e){return NextResponse.json({error:e instanceof Error?e.message:'Unable to create deal'},{status:400})}}
