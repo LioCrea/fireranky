@@ -1,0 +1,1 @@
+import{NextResponse}from'next/server';import{listAgreements}from'../../lib/server-agreement';export async function GET(req:Request){try{return NextResponse.json({agreements:await listAgreements(req)})}catch(e){return NextResponse.json({error:e instanceof Error?e.message:'Unable to load agreements'},{status:400})}}
