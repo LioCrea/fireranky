@@ -22,7 +22,7 @@ export async function createAgreement(req:Request,fireId:string){
  const op:any=await publicOpportunity(fire.opportunityId);
  if(!op||op.companyId!==identity.userId)throw new Error('Opportunity not owned by this company.');
  const company:any=await getProfile(identity.userId),now=new Date().toISOString(),agreementId=fireId;
- const item={agreementId,fireId,opportunityId:fire.opportunityId,companyId:identity.userId,repId:fire.repId,status:'AWAITING_REP',version:1,terms:{companyName:company?.companyName||op.companyName,repName:`${fire.repSnapshot?.firstName||''} ${fire.repSnapshot?.lastName||''}`.trim(),campaign:op.title,territory:op.territory,commission:op.commission,basis:op.basis,paymentDays:30,leadProtectionDays:90,tailDays:60,leadChallengeHours:48,firerankyFeeRate:FIRERANKY_FEE_RATE},companyAcceptedAt:now,createdAt:now,updatedAt:now};
+ const item={agreementId,fireId,opportunityId:fire.opportunityId,companyId:identity.userId,repId:fire.repId,status:'AWAITING_REP',version:1,terms:{companyName:company?.companyName||op.companyName,repName:`${fire.repSnapshot?.firstName||''} ${fire.repSnapshot?.lastName||''}`.trim(),campaign:op.title,territory:op.territory,commission:op.commission,basis:op.basis,paymentDays:30,leadProtectionDays:90,tailDays:60,leadChallengeHours:48,firerankyFeeRate:FIRERANKY_FEE_RATE,feePaidBy:'COMPANY'},companyAcceptedAt:now,createdAt:now,updatedAt:now};
  await ddb.send(new PutCommand({TableName:agreements,Item:item}));
  await ddb.send(new UpdateCommand({TableName:fires,Key:{fireId},UpdateExpression:'SET #s=:s, agreementId=:a, updatedAt=:u',ExpressionAttributeNames:{'#s':'status'},ExpressionAttributeValues:{':s':'AGREEMENT_PENDING',':a':agreementId,':u':now}}));
  return item;
@@ -46,9 +46,9 @@ export async function transitionLead(req:Request,leadId:string,body:any){
  else if(action==='CHALLENGE'&&company&&['REGISTERED','QUALIFIED','PROPOSAL'].includes(lead.status)){if(Date.now()>new Date(lead.challengeDeadline).getTime())throw new Error('Challenge window has expired.');next='CHALLENGED';if(!note)throw new Error('Challenge reason is required.');}
  else if(action==='CONFIRM_WON'&&company&&lead.status==='WON_CLAIMED'){
    const a:any=await getAgreementFor(req,lead.agreementId),raw=String(a.terms.commission||''),percent=raw.includes('%');
-   const grossCommission=percent?round2((lead.contractValue||0)*(money(raw)/100)):round2(money(raw));
-   const feeRate=Number(a.terms.firerankyFeeRate??FIRERANKY_FEE_RATE),firerankyFee=round2(grossCommission*feeRate),repNetCommission=round2(grossCommission-firerankyFee);
-   next='COMMISSION_DUE';extra.commissionFormula=percent?`${money(raw)}% × $${Number(lead.contractValue||0).toLocaleString('en-US')}`:`${raw} ${a.terms.basis||''}`.trim();extra.grossCommission=grossCommission;extra.firerankyFeeRate=feeRate;extra.firerankyFee=firerankyFee;extra.repNetCommission=repNetCommission;extra.commissionDue=repNetCommission;extra.commissionDueAt=now;extra.paymentDueAt=new Date(Date.now()+(a.terms.paymentDays||30)*86400000).toISOString();
+   const repCommission=percent?round2((lead.contractValue||0)*(money(raw)/100)):round2(money(raw));
+   const feeRate=Number(a.terms.firerankyFeeRate??FIRERANKY_FEE_RATE),firerankyFee=round2(repCommission*feeRate),companyTotalCost=round2(repCommission+firerankyFee);
+   next='COMMISSION_DUE';extra.commissionFormula=percent?`${money(raw)}% × $${Number(lead.contractValue||0).toLocaleString('en-US')}`:`${raw} ${a.terms.basis||''}`.trim();extra.repCommission=repCommission;extra.grossCommission=repCommission;extra.firerankyFeeRate=feeRate;extra.firerankyFee=firerankyFee;extra.companyTotalCost=companyTotalCost;extra.repNetCommission=repCommission;extra.commissionDue=repCommission;extra.feePaidBy='COMPANY';extra.commissionDueAt=now;extra.paymentDueAt=new Date(Date.now()+(a.terms.paymentDays||30)*86400000).toISOString();
  }
  else if(action==='MARK_PAID'&&company&&lead.status==='COMMISSION_DUE'){next='PAID_PENDING_CONFIRMATION';extra.paidDeclaredAt=now;extra.paymentReference=String(body.paymentReference||'').trim();}
  else if(action==='CONFIRM_RECEIPT'&&rep&&lead.status==='PAID_PENDING_CONFIRMATION'){next='PAID';extra.paidConfirmedAt=now;}
