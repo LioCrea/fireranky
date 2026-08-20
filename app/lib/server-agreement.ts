@@ -8,6 +8,7 @@ const agreements=process.env.FIRERANKY_AGREEMENTS_TABLE||'fireranky-agreements-d
 const leads=process.env.FIRERANKY_LEADS_TABLE||'fireranky-leads-dev';
 const fires=process.env.FIRERANKY_FIRES_TABLE||'fireranky-fires-dev';
 const ddb=DynamoDBDocumentClient.from(new DynamoDBClient({region}),{marshallOptions:{removeUndefinedValues:true}});
+const normalizeAgreementId=(id:string)=>decodeURIComponent(String(id||''));
 
 export async function createAgreement(req:Request,fireId:string){
  const identity=await identityFromRequest(req);
@@ -28,7 +29,8 @@ export async function createAgreement(req:Request,fireId:string){
 
 export async function getAgreementFor(req:Request,agreementId:string){
  const identity=await identityFromRequest(req);
- const r=await ddb.send(new GetCommand({TableName:agreements,Key:{agreementId}}));
+ const key=normalizeAgreementId(agreementId);
+ const r=await ddb.send(new GetCommand({TableName:agreements,Key:{agreementId:key}}));
  const a:any=r.Item;
  if(!a||![a.repId,a.companyId].includes(identity.userId))throw new Error('Agreement not found.');
  return a;
@@ -36,10 +38,11 @@ export async function getAgreementFor(req:Request,agreementId:string){
 
 export async function acceptAgreement(req:Request,agreementId:string){
  const identity=await identityFromRequest(req);
- const a:any=await getAgreementFor(req,agreementId);
+ const key=normalizeAgreementId(agreementId);
+ const a:any=await getAgreementFor(req,key);
  if(identity.userId!==a.repId)throw new Error('Sales rep required.');
  const now=new Date().toISOString();
- const r=await ddb.send(new UpdateCommand({TableName:agreements,Key:{agreementId},UpdateExpression:'SET #s=:s, repAcceptedAt=:u, activatedAt=:u, updatedAt=:u',ExpressionAttributeNames:{'#s':'status'},ExpressionAttributeValues:{':s':'ACTIVE',':u':now},ReturnValues:'ALL_NEW'}));
+ const r=await ddb.send(new UpdateCommand({TableName:agreements,Key:{agreementId:key},UpdateExpression:'SET #s=:s, repAcceptedAt=:u, activatedAt=:u, updatedAt=:u',ExpressionAttributeNames:{'#s':'status'},ExpressionAttributeValues:{':s':'ACTIVE',':u':now},ReturnValues:'ALL_NEW'}));
  await ddb.send(new UpdateCommand({TableName:fires,Key:{fireId:a.fireId},UpdateExpression:'SET #s=:s, updatedAt=:u',ExpressionAttributeNames:{'#s':'status'},ExpressionAttributeValues:{':s':'ACTIVE_REP',':u':now}}));
  return r.Attributes;
 }
@@ -52,13 +55,14 @@ export async function listAgreements(req:Request){
 
 export async function registerLead(req:Request,agreementId:string,body:any){
  const identity=await identityFromRequest(req);
- const a:any=await getAgreementFor(req,agreementId);
+ const key=normalizeAgreementId(agreementId);
+ const a:any=await getAgreementFor(req,key);
  if(identity.userId!==a.repId||a.status!=='ACTIVE')throw new Error('Active rep agreement required.');
  const name=String(body.companyName||'').trim();
  if(!name)throw new Error('Prospect company is required.');
  const now=new Date().toISOString();
- const leadId=`${agreementId}#${Date.now().toString(36)}`;
- const item={leadId,agreementId,opportunityId:a.opportunityId,companyId:a.companyId,repId:a.repId,prospectCompany:name,contactName:String(body.contactName||''),contactEmail:String(body.contactEmail||''),status:'REGISTERED',registeredAt:now,challengeDeadline:new Date(Date.now()+a.terms.leadChallengeHours*3600000).toISOString(),protectionUntil:new Date(Date.now()+a.terms.leadProtectionDays*86400000).toISOString(),createdAt:now,updatedAt:now};
+ const leadId=`${key}#${Date.now().toString(36)}`;
+ const item={leadId,agreementId:key,opportunityId:a.opportunityId,companyId:a.companyId,repId:a.repId,prospectCompany:name,contactName:String(body.contactName||''),contactEmail:String(body.contactEmail||''),status:'REGISTERED',registeredAt:now,challengeDeadline:new Date(Date.now()+a.terms.leadChallengeHours*3600000).toISOString(),protectionUntil:new Date(Date.now()+a.terms.leadProtectionDays*86400000).toISOString(),createdAt:now,updatedAt:now};
  await ddb.send(new PutCommand({TableName:leads,Item:item}));
  return item;
 }
