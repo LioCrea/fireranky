@@ -1,5 +1,6 @@
 import { Amplify } from 'aws-amplify';
 import {
+  fetchAuthSession,
   fetchUserAttributes,
   getCurrentUser as amplifyGetCurrentUser,
   signIn as amplifySignIn,
@@ -55,6 +56,14 @@ export async function getCurrentUser(): Promise<FireRankyUser | null> {
   } catch {
     return null;
   }
+}
+
+export async function getIdToken(): Promise<string> {
+  ensureConfigured();
+  const session = await fetchAuthSession();
+  const token = session.tokens?.idToken?.toString();
+  if (!token) throw new Error('No Cognito session found.');
+  return token;
 }
 
 export async function signUp(email: string, password: string, role: UserRole): Promise<FireRankyUser> {
