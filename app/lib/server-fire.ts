@@ -42,7 +42,7 @@ export async function fireIdentity(request: Request){
 
 export async function getFire(repId:string, opportunityId:string){
   const fireId=`${repId}#${opportunityId}`;
-  const result=await ddb.send(new GetCommand({TableName:tableName,Key:{fireId}}));
+  const result=await ddb.send(new GetCommand({TableName:tableName,Key:{fireId},ConsistentRead:true}));
   return (result.Item as FireApplication|undefined)||null;
 }
 
@@ -63,5 +63,7 @@ export async function createFire(request:Request, opportunityId:string){
     repSnapshot:{firstName:profile.firstName,lastName:profile.lastName,country:profile.country,city:profile.city,yearsExperience:profile.yearsExperience,industries:profile.industries,linkedinUrl:profile.linkedinUrl,bio:profile.bio},
   };
   await ddb.send(new PutCommand({TableName:tableName,Item:fire,ConditionExpression:'attribute_not_exists(fireId)'}));
-  return fire;
+  const persisted=await getFire(identity.userId,opportunityId);
+  if(!persisted) throw new Error(`Fire write was not persisted in ${tableName} (${region}).`);
+  return persisted;
 }
