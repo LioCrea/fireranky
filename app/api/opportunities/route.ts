@@ -1,0 +1,1 @@
+import{NextResponse}from'next/server';import{publicOpportunities}from'../../lib/server-company';export async function GET(){try{return NextResponse.json({opportunities:await publicOpportunities()})}catch(e){return NextResponse.json({error:e instanceof Error?e.message:'Unable to load opportunities'},{status:500})}}
