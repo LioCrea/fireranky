@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import './auth.css';
+import './detail.css';
 
 export const metadata: Metadata = {
   title: 'FireRanky — Pick what you sell.',
