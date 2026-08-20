@@ -33,10 +33,10 @@ export default function Home(){
  const [user,setUser]=useState<FireRankyUser|null>(null);
  const [authMode,setAuthMode]=useState<'signup'|'login'|null>(null);
  const [pendingSlug,setPendingSlug]=useState<string|null>(null);
- useEffect(()=>setUser(getCurrentUser()),[]);
+ useEffect(()=>{let alive=true;getCurrentUser().then(current=>{if(alive)setUser(current)});return()=>{alive=false}},[]);
  function fire(slug:string){ if(!user){setPendingSlug(slug);setAuthMode('signup');return;} window.location.href=`/opportunities/${slug}`; }
  function authSuccess(nextUser:FireRankyUser){setUser(nextUser);setAuthMode(null);if(pendingSlug){const slug=pendingSlug;setPendingSlug(null);window.location.href=`/opportunities/${slug}`;}}
- function logout(){signOut();setUser(null);}
+ async function logout(){await signOut();setUser(null);}
  return <main>
  {authMode&&<AuthModal mode={authMode} onClose={()=>{setAuthMode(null);setPendingSlug(null)}} onSuccess={authSuccess} onModeChange={setAuthMode}/>} 
  <nav className="nav shell"><a className="brand" href="#"><span className="brandMark"><Flame size={19} fill="currentColor"/></span><span>FireRanky</span></a><div className="navLinks"><a href="#opportunities">Opportunities</a><a href="#leaderboard">Leaderboard</a><a href="#companies">For companies</a></div><div className="navActions">{user?<><span className="userPill"><b>{user.role==='sales'?'🔥':'🏢'}</b>{user.email}</span><button className="ghostBtn" onClick={logout}>Sign out</button></>:<><button className="ghostBtn" onClick={()=>setAuthMode('login')}>Sign in</button><button className="primaryBtn small" onClick={()=>setAuthMode('signup')}>Join FireRanky <ArrowRight size={15}/></button></>}</div></nav>
