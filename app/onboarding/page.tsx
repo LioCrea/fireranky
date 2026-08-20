@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
 import { ArrowRight, Building2, Check, Flame, Loader2, Sparkles, UserRound } from 'lucide-react';
 import { getCurrentUser, getIdToken, type FireRankyUser } from '../lib/auth';
 
@@ -14,9 +13,13 @@ type Profile = {
   companyName?: string; website?: string; contactRole?: string;
 };
 
+function getSafeNext(){
+  if(typeof window==='undefined') return '/';
+  const raw=new URLSearchParams(window.location.search).get('next')||'/';
+  return raw.startsWith('/')&&!raw.startsWith('//')?raw:'/';
+}
+
 export default function OnboardingPage(){
-  const search = useSearchParams();
-  const next = search.get('next') || '/';
   const [user,setUser] = useState<FireRankyUser|null>(null);
   const [loading,setLoading] = useState(true);
   const [saving,setSaving] = useState(false);
@@ -33,10 +36,10 @@ export default function OnboardingPage(){
       if(!res.ok) throw new Error((await res.json()).error || 'Unable to load profile');
       const data=await res.json();
       setForm({...data.profile,industries:data.profile.industries||[]});
-      if(data.profile.profileComplete) window.location.href=next;
+      if(data.profile.profileComplete) window.location.href=getSafeNext();
     }catch(err){setError(err instanceof Error?err.message:'Unable to load profile');}
     finally{setLoading(false);}
-  })()},[next]);
+  })()},[]);
 
   const selected = useMemo(()=>new Set(form.industries||[]),[form.industries]);
   function set<K extends keyof Profile>(key:K,value:Profile[K]){setForm(prev=>({...prev,[key]:value}))}
@@ -51,7 +54,7 @@ export default function OnboardingPage(){
       const token=await getIdToken();
       const res=await fetch('/api/profile',{method:'PUT',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify(form)});
       if(!res.ok) throw new Error((await res.json()).error || 'Unable to save profile');
-      window.location.href=next;
+      window.location.href=getSafeNext();
     }catch(err){setError(err instanceof Error?err.message:'Unable to save profile');setSaving(false)}
   }
 
