@@ -2,7 +2,6 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
 import { CognitoJwtVerifier } from 'aws-jwt-verify';
 
-const region = process.env.AWS_REGION || process.env.NEXT_PUBLIC_AWS_REGION || 'eu-west-3';
 const tableName = process.env.FIRERANKY_USERS_TABLE || 'fireranky-users-dev';
 const userPoolId = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID;
 const clientId = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_CLIENT_ID;
@@ -10,6 +9,8 @@ const clientId = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_CLIENT_ID;
 if (!userPoolId || !clientId) {
   throw new Error('Missing Cognito environment variables.');
 }
+
+const region = process.env.AWS_REGION || userPoolId.split('_')[0];
 
 const verifier = CognitoJwtVerifier.create({
   userPoolId,
@@ -75,20 +76,19 @@ export async function ensureProfile(identity: {userId:string;email:string;role:P
 export async function saveProfile(identity: {userId:string;email:string;role:ProfileRole}, values: Partial<FireRankyProfile>) {
   const existing = await ensureProfile(identity);
   const now = new Date().toISOString();
-  const allowed = identity.role === 'sales'
+  const allowed: (keyof FireRankyProfile)[] = identity.role === 'sales'
     ? ['firstName','lastName','country','city','linkedinUrl','yearsExperience','industries','bio']
     : ['companyName','website','country','contactRole'];
-  const clean: Record<string, unknown> = {};
-  for (const key of allowed) if (values[key as keyof FireRankyProfile] !== undefined) clean[key] = values[key as keyof FireRankyProfile];
-  const profile: FireRankyProfile = {
-    ...existing,
-    ...clean,
-    userId: identity.userId,
-    email: identity.email,
-    role: identity.role,
-    profileComplete: true,
-    updatedAt: now,
-  };
+  const profile: FireRankyProfile = { ...existing };
+  for (const key of allowed) {
+    const value = values[key];
+    if (value !== undefined) (profile as Record<string, unknown>)[key] = value;
+  }
+  profile.userId = identity.userId;
+  profile.email = identity.email;
+  profile.role = identity.role;
+  profile.profileComplete = true;
+  profile.updatedAt = now;
   await ddb.send(new PutCommand({ TableName: tableName, Item: profile }));
   return profile;
 }
