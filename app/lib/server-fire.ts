@@ -4,7 +4,9 @@ import { identityFromRequest, getProfile } from './server-profile';
 
 const region = process.env.AWS_REGION || process.env.NEXT_PUBLIC_AWS_REGION || 'eu-west-3';
 const tableName = process.env.FIRERANKY_FIRES_TABLE || 'fireranky-fires-dev';
-const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({ region }));
+const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({ region }), {
+  marshallOptions: { removeUndefinedValues: true },
+});
 
 export type FireApplication = {
   fireId: string;
@@ -49,8 +51,12 @@ export async function getFire(repId:string, opportunityId:string){
 export async function createFire(request:Request, opportunityId:string){
   const {identity,profile}=await fireIdentity(request);
   const fireId=`${identity.userId}#${opportunityId}`;
+  console.log('[FireRanky FIRE] target', { tableName, region, fireId });
   const existing=await getFire(identity.userId,opportunityId);
-  if(existing)return existing;
+  if(existing){
+    console.log('[FireRanky FIRE] already exists', fireId);
+    return existing;
+  }
   const now=new Date().toISOString();
   const fire:FireApplication={
     fireId,
@@ -63,7 +69,9 @@ export async function createFire(request:Request, opportunityId:string){
     repSnapshot:{firstName:profile.firstName,lastName:profile.lastName,country:profile.country,city:profile.city,yearsExperience:profile.yearsExperience,industries:profile.industries,linkedinUrl:profile.linkedinUrl,bio:profile.bio},
   };
   await ddb.send(new PutCommand({TableName:tableName,Item:fire,ConditionExpression:'attribute_not_exists(fireId)'}));
+  console.log('[FireRanky FIRE] PutItem accepted', fireId);
   const persisted=await getFire(identity.userId,opportunityId);
   if(!persisted) throw new Error(`Fire write was not persisted in ${tableName} (${region}).`);
+  console.log('[FireRanky FIRE] persisted', persisted.fireId);
   return persisted;
 }
