@@ -40,7 +40,7 @@ export async function acceptAgreement(req:Request,agreementId:string){
  if(identity.userId!==a.repId)throw new Error('Sales rep required.');
  const now=new Date().toISOString();
  const r=await ddb.send(new UpdateCommand({TableName:agreements,Key:{agreementId},UpdateExpression:'SET #s=:s, repAcceptedAt=:u, activatedAt=:u, updatedAt=:u',ExpressionAttributeNames:{'#s':'status'},ExpressionAttributeValues:{':s':'ACTIVE',':u':now},ReturnValues:'ALL_NEW'}));
- await ddb.send(new UpdateCommand({TableName:fires,Key:{a.fireId},UpdateExpression:'SET #s=:s, updatedAt=:u',ExpressionAttributeNames:{'#s':'status'},ExpressionAttributeValues:{':s':'ACTIVE_REP',':u':now}}));
+ await ddb.send(new UpdateCommand({TableName:fires,Key:{fireId:a.fireId},UpdateExpression:'SET #s=:s, updatedAt=:u',ExpressionAttributeNames:{'#s':'status'},ExpressionAttributeValues:{':s':'ACTIVE_REP',':u':now}}));
  return r.Attributes;
 }
 
