@@ -1,0 +1,21 @@
+import { NextResponse } from 'next/server';
+import { createFire, getFire, fireIdentity } from '../../../lib/server-fire';
+
+function message(error:unknown){return error instanceof Error?error.message:'Unexpected error';}
+
+export async function GET(request:Request,{params}:{params:Promise<{opportunityId:string}>}){
+  try{
+    const {opportunityId}=await params;
+    const {identity}=await fireIdentity(request);
+    const fire=await getFire(identity.userId,opportunityId);
+    return NextResponse.json({fire});
+  }catch(error){const msg=message(error);return NextResponse.json({error:msg},{status:msg==='Unauthorized'?401:400});}
+}
+
+export async function POST(request:Request,{params}:{params:Promise<{opportunityId:string}>}){
+  try{
+    const {opportunityId}=await params;
+    const fire=await createFire(request,opportunityId);
+    return NextResponse.json({fire},{status:201});
+  }catch(error){const msg=message(error);return NextResponse.json({error:msg},{status:msg==='Unauthorized'?401:400});}
+}
